@@ -70,12 +70,14 @@ This project implements a **Smart Door Lock System** using a **Raspberry Pi Pico
 
 ## ✅ MicroPython Libraries Required
 
-- `machine` – GPIO control  
+- `machine` – GPIO control
+- `serial` - Communicate with Controller through UART
 - `time` – Delays and timestamps  
 - `random` – OTP generation  
-- `uos`, `json` – Configuration and file handling  
+- `face recognition` - Detecting and Recognising Face
+- `pickle` - Saving and Loading Python Objects
+- `cv2` - Caputuring Facial Features
 - `uart` – GSM module communication  
-- `network` – Wi-Fi setup (if remote features added)
 
 ---
 
