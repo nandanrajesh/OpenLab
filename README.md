@@ -113,7 +113,7 @@ This project implements a **Smart Door Lock System** using a **Raspberry Pi Pico
 
 - [Gopikrishna K (CB.EN.U4ELC22012)](https://github.com/vcgopi2k04)  
 - [Harikrishnan Miraj (CB.EN.U4ELC22014)](https://github.com/hxrik)
-- Jaisrihari G (CB.EN.U4ELC22015)  
+- [Jaisrihari G (CB.EN.U4ELC22015)](https://github.com/JAISRIHARI)  
 - [Nandan Rajesh (CB.EN.U4ELC22063)](https://github.com/nandanrajesh)  
 
 ---
