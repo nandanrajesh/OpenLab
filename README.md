@@ -1,4 +1,4 @@
-# 🔐 Intelligent Layered Smart Door Lock System (MicroPython + Raspberry Pi)
+# Intelligent Layered Smart Door Lock System (MicroPython + Raspberry Pi)
 
 ## 📌 Project Overview
 
@@ -8,14 +8,14 @@ This project implements a **Smart Door Lock System** using a **Raspberry Pi Pico
 
 ## 💡 Key Features
 
-- 🎦 Face Recognition (pre-trained encoding using HOG - performed externally and stored in MicroPython-readable format)
-- 🟢 OTP Authentication via GSM fallback when face recognition fails
-- 📏 Ultrasonic detection for presence sensing
-- 🔐 Relay-based solenoid lock control
-- 🚨 Buzzer alert on unauthorized access attempts
-- 📲 SMS-based intrusion alerts using GSM
-- 🔴🟢 Real-time feedback using LEDs
-- ⚡ Lightweight and cost-effective using MicroPython
+- Face Recognition (pre-trained encoding using HOG - performed externally and stored in MicroPython-readable format)
+- OTP Authentication via GSM fallback when face recognition fails
+- Ultrasonic detection for presence sensing
+- Relay-based solenoid lock control
+- Buzzer alert on unauthorized access attempts
+- SMS-based intrusion alerts using GSM
+- Real-time feedback using LEDs
+- Lightweight and cost-effective using MicroPython
 
 ---
 
@@ -93,11 +93,11 @@ This project implements a **Smart Door Lock System** using a **Raspberry Pi Pico
 
 ## 🔮 Future Improvements
 
-- 📱 Mobile app or web UI for door control and logs
-- ☁️ Cloud storage for access logs and face recognition
-- 🔋 Battery backup for power failure scenarios
-- 🤖 Deep Learning model (if offloaded to Pi 4 or Jetson Nano)
-- 🛡️ Anti-spoofing with liveness detection (e.g., blink or depth sensing)
+- Mobile app or web UI for door control and logs
+- Cloud storage for access logs and face recognition
+- Battery backup for power failure scenarios
+- Deep Learning model (if offloaded to Pi 4 or Jetson Nano)
+- 🛡Anti-spoofing with liveness detection (e.g., blink or depth sensing)
 
 ---
 
