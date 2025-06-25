@@ -1,29 +1,127 @@
 import RPi.GPIO as GPIO
 import time
+import random
+import serial
+import face_recognition
+import pickle
+import numpy as np
+import cv2
+from picamera2 import Picamera2
+from time import sleep
 
-# Define GPIO Pins for Rows and Columns
-ROW_PINS = [5, 6, 13, 19]  # R1, R2, R3, R4
-COL_PINS = [26, 16, 20, 21] # C1, C2, C3, C4
-
-# Keypad layout
-KEYS = [
-    ['1', '2', '3', 'A'],
-    ['4', '5', '6', 'B'],
-    ['7', '8', '9', 'C'],
-    ['*', '0', '#', 'D']
-]
-
-# Setup GPIO
+# ==== GPIO Pin Configuration ====
 GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+
+# Ultrasonic Sensor Pins
+GPIO_TRIG = 23
+GPIO_ECHO = 24
+
+# Relay (Solenoid Lock) Pin
+GPIO_RELAY = 18
+BUZZER_PIN = 22  # Change to the GPIO pin used
+# LED Indicators
+GPIO_RED_LED = 17
+GPIO_GREEN_LED = 27
+
+# Button for retrying face recognition
+GPIO_BUTTON = 4
+ROW_PINS = [5, 6, 13, 19]
+COL_PINS = [26, 16, 20, 21]
+KEYS = [['1', '2', '3', 'A'], ['4', '5', '6', 'B'], ['7', '8', '9', 'C'], ['*', '0', '#', 'D']]
 
 for row in ROW_PINS:
     GPIO.setup(row, GPIO.OUT)
     GPIO.output(row, GPIO.LOW)
-
 for col in COL_PINS:
     GPIO.setup(col, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    
+GPIO.setup(BUZZER_PIN, GPIO.OUT)
+GPIO.setup(GPIO_TRIG, GPIO.OUT)
+GPIO.setup(GPIO_ECHO, GPIO.IN)
+GPIO.setup(GPIO_RELAY, GPIO.OUT, initial=GPIO.HIGH)  # Start with relay HIGH (solenoid locked)
+GPIO.setup(GPIO_RED_LED, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(GPIO_GREEN_LED, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(GPIO_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Button with pull-up resistor
+
+# Initialize PiCamera2
+picam2 = Picamera2()
+picam2.preview_configuration.main.size = (640, 480)
+picam2.preview_configuration.main.format = "RGB888"
+picam2.configure("preview")
+picam2.start()
+
+def pulse_relay(duration=0.5):
+    GPIO.output(GPIO_RELAY, GPIO.LOW)  # Unlock solenoid
+    sleep(duration)
+    GPIO.output(GPIO_RELAY, GPIO.HIGH)  # Lock solenoid
+
+def measure_distance():
+    GPIO.output(GPIO_TRIG, GPIO.LOW)
+    time.sleep(0.1)
+
+    GPIO.output(GPIO_TRIG, GPIO.HIGH)
+    time.sleep(0.00001)
+    GPIO.output(GPIO_TRIG, GPIO.LOW)
+
+    start_time = time.time()
+    timeout = start_time + 0.1
+
+    while GPIO.input(GPIO_ECHO) == 0:
+        start_time = time.time()
+        if start_time > timeout:
+            return -1  
+
+    bounce_back_time = time.time()
+    timeout = bounce_back_time + 0.1
+
+    while GPIO.input(GPIO_ECHO) == 1:
+        bounce_back_time = time.time()
+        if bounce_back_time > timeout:
+            return -1  
+
+    pulse_duration = bounce_back_time - start_time
+    distance = round(pulse_duration * 17150, 2)
+
+    return distance if 2 <= distance <= 400 else -1  
+
+def capture_image():
+    frame = picam2.capture_array()
+    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    image_path = "/home/pi/face_rec/captured_image.jpg"
+    cv2.imwrite(image_path, frame_bgr)
+    print("[📸] Image Captured!")
+    return image_path
+
+def send_sms(number, message):
+    """Sends an SMS using the GSM module."""
+    try:
+        ser = serial.Serial("/dev/serial0", baudrate=115200, timeout=1)
+        ser.write(b'AT+CMGF=1\r\n')
+        time.sleep(1)
+        ser.write(f'AT+CMGS="{number}"\r\n'.encode())
+        time.sleep(1)
+        ser.write(message.encode())
+        ser.write(bytes([26]))  # Ctrl+Z to send
+        time.sleep(3)
+        print("✅ SMS Sent Successfully!")
+    except Exception as e:
+        print("❌ SMS Failed:", e)
+
+def display_text(text):
+    """Displays text on the OLED screen."""
+    image = Image.new("1", (128, 64), color=0)  # Black background
+    draw = ImageDraw.Draw(image)
+    
+    draw.text((10, 20), "Enter OTP:", font=font, fill=255)
+    draw.text((30, 40), text, font=font, fill=255)
+    
+    oled.image(image)
+    oled.show()
+    
 
 def read_keypad():
+    """Reads a single key press from the keypad."""
     for i, row in enumerate(ROW_PINS):
         GPIO.output(row, GPIO.HIGH)
         for j, col in enumerate(COL_PINS):
@@ -33,13 +131,162 @@ def read_keypad():
         GPIO.output(row, GPIO.LOW)
     return None
 
-try:
+def get_otp_from_keypad():
+    """Gets a 4-digit OTP from the keypad."""
+    entered_otp = ""
+    print("\nEnter OTP (press 'A' to submit, 'C' to clear):", end=" ", flush=True)
+
     while True:
         key = read_keypad()
         if key:
-            print(f"Key Pressed: {key}")
-            time.sleep(0.3)  # Debounce delay
+            if key == 'C':  # Clear input
+                entered_otp = ""
+                print("\rEnter OTP: ", " " * 10, end="\rEnter OTP: ", flush=True)
+            elif key == 'A':  # Submit OTP
+                print(f"\nYou entered: {entered_otp}")  # Show entered OTP
+                return entered_otp
+            elif key.isdigit() and len(entered_otp) < 4:
+                entered_otp += key
+                print(key, end="", flush=True)  # Show digits instead of *
 
+        time.sleep(0.3)
+
+def handle_otp_authentication():
+    """Handles a single OTP authentication attempt."""
+    otp = random.randint(1000, 9999)
+    send_sms("+916282137192", f"Your OTP is {otp}")
+
+    entered_otp = get_otp_from_keypad()
+    if entered_otp == str(otp):
+        print("✅ OTP Correct! Unlocking...")
+        send_sms("+916282137192", f"Door unlocked via OTP at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        GPIO.output(GPIO_RELAY, GPIO.LOW)
+        sleep(5)
+        GPIO.output(GPIO_RELAY, GPIO.HIGH)
+        return True
+    else:
+        print("❌ Incorrect OTP.")
+        return False
+
+def recognize_face():
+    sleep(2)
+    image_path = capture_image()
+    print("[INFO] Loading face encodings...")
+    known_face_encodings = []
+    known_face_names = []
+
+    with open("/home/pi/face_rec/ultrasonic/encodings_NANDAN.pickle", "rb") as f:
+        Encode_Nandan = pickle.loads(f.read())["Encode_Nandan"]
+    known_face_encodings.extend(Encode_Nandan)
+    known_face_names.extend(["NANDAN"] * len(Encode_Nandan))
+
+    with open("/home/pi/face_rec/ultrasonic/encodings_GOPI.pickle", "rb") as f:
+        Encode_Gopi = pickle.loads(f.read())["Encode_Gopi"]
+    known_face_encodings.extend(Encode_Gopi)
+    known_face_names.extend(["GOPI"] * len(Encode_Gopi))
+
+    print(f"[INFO] Loaded {len(known_face_encodings)} face encodings.")
+    test_image = face_recognition.load_image_file(image_path)
+    test_encodings = face_recognition.face_encodings(test_image)
+
+    if len(test_encodings) == 0:
+        print("❌ No face found in the captured image")
+        GPIO.output(GPIO_RED_LED, GPIO.HIGH)
+        sleep(2)
+        GPIO.output(GPIO_RED_LED, GPIO.LOW)
+        return False  
+
+    test_encoding = test_encodings[0]  
+    matches = face_recognition.compare_faces(known_face_encodings, test_encoding)
+    face_distances = face_recognition.face_distance(known_face_encodings, test_encoding)
+    best_match_index = np.argmin(face_distances)
+    best_match_score = 1 - face_distances[best_match_index]
+
+    threshold = 0.60 
+
+    if matches[best_match_index] and best_match_score >= threshold:
+        print(f"✅ Match Found: {known_face_names[best_match_index]}")
+        print(f"🔹 Similarity Score: {best_match_score:.2f}")
+        GPIO.output(GPIO_GREEN_LED, GPIO.HIGH)
+        sleep(2)
+        GPIO.output(GPIO_GREEN_LED, GPIO.LOW)
+        return True  
+    else:
+        print("❌ No match found.")
+        GPIO.output(GPIO_RED_LED, GPIO.HIGH)
+        sleep(2)
+        GPIO.output(GPIO_RED_LED, GPIO.LOW)
+        return False  
+
+# ==== Main Loop ====
+import sys
+
+try:
+    GPIO.output(GPIO_RELAY, GPIO.HIGH)
+    print("🔒 Solenoid locked at startup.")
+    GPIO.output(GPIO_GREEN_LED, GPIO.HIGH)
+    sleep(5)
+    GPIO.output(GPIO_GREEN_LED, GPIO.LOW)
+    while True:
+        distance = measure_distance()
+        sleep(2)
+
+        if distance == -1:
+            print("⚠ Invalid reading, retrying...")
+        else:
+            print(f"📏 Distance: {distance} cm")
+            if distance < 50:
+                print("🚨 Person detected! Running face recognition...")
+                attempts = 3
+
+                for _ in range(attempts):
+                    if recognize_face():
+                        print(f"✅ Match Found: {recognize_face()}. Unlocking...")
+                        send_sms("+916282137192", f"Door unlocked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+                        GPIO.output(GPIO_RELAY, GPIO.LOW)
+                        sleep(5)
+                        print("🔒 Locking door...")
+                        GPIO.output(GPIO_RELAY, GPIO.HIGH)
+                        break
+                else:
+                    print("❌ All attempts failed. Press button to send OTP.")
+                    GPIO.output(GPIO_GREEN_LED, GPIO.HIGH)
+                    sleep(2)
+                    GPIO.output(GPIO_GREEN_LED, GPIO.LOW)
+                    sleep(2)
+                    GPIO.output(GPIO_GREEN_LED, GPIO.HIGH)
+                    sleep(2)
+                    GPIO.output(GPIO_GREEN_LED, GPIO.LOW)
+                    attempt = 2  # Allow up to 2 attempts
+                    while attempt > 0:
+                        if handle_otp_authentication():
+                            print("🔓 Door unlocked via OTP!")
+                            GPIO.output(GPIO_GREEN_LED, GPIO.HIGH)
+                            sleep(2)
+                            GPIO.output(GPIO_GREEN_LED, GPIO.LOW)
+                            break  # ✅ Fix: Use break instead of return
+                        else:
+                            attempt -= 1
+                            print(f"❌ Incorrect OTP. Attempts left: {attempt}")
+
+                    if attempt == 0:
+                        print("🚨 System locked due to authentication failure.")
+                        send_sms("+916282137192", f"Intruder Alert! Check your home security {time.strftime('%Y-%m-%d %H:%M:%S')}.")
+                        GPIO.output(BUZZER_PIN, GPIO.HIGH)  # Turn ON buzzer
+                        time.sleep(5)  # Buzz for 3 seconds
+                        GPIO.output(BUZZER_PIN, GPIO.LOW) 
+                        start_time = time.time()
+                        while GPIO.input(GPIO_BUTTON) == GPIO.HIGH and (time.time() - start_time) < 10:
+                            GPIO.output(GPIO_RED_LED, GPIO.HIGH)
+                            sleep(0.5)
+                            GPIO.output(GPIO_RED_LED, GPIO.LOW)
+                            sleep(0.5)
+                        print("🔄 Restarting ultrasonic detection...")
 except KeyboardInterrupt:
-    print("Exiting...")
+    print("\n🔴 Exiting...")
+finally:
+    print("⚠ Emergency unlock! Unlocking solenoid...")
+    GPIO.output(GPIO_RELAY, GPIO.LOW)
+    sleep(1)
     GPIO.cleanup()
+    sys.exit(0)  # ✅ Fix: Use sys.exit() to properly exit the script
