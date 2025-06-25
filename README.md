@@ -97,7 +97,7 @@ This project implements a **Smart Door Lock System** using a **Raspberry Pi Pico
 - Cloud storage for access logs and face recognition
 - Battery backup for power failure scenarios
 - Deep Learning model (if offloaded to Pi 4 or Jetson Nano)
-- 🛡Anti-spoofing with liveness detection (e.g., blink or depth sensing)
+- Anti-spoofing with liveness detection (e.g., blink or depth sensing)
 
 ---
 
