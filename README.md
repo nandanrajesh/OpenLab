@@ -1,4 +1,4 @@
-# 🔐 Intelligent Layered Smart Door Lock System (MicroPython + Raspberry Pi Pico W)
+# 🔐 Intelligent Layered Smart Door Lock System (MicroPython + Raspberry Pi)
 
 ## 📌 Project Overview
 
