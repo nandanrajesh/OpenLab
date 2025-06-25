@@ -25,7 +25,6 @@ This project implements a **Smart Door Lock System** using a **Raspberry Pi Pico
 |-------------------|------------------------------------------|
 | Raspberry Pi Pico W | Wi-Fi enabled microcontroller board    |
 | Pi Camera (external Pi or used in training) | For training facial data |
-| BME680 Sensor     | Environment monitoring (optional)        |
 | Ultrasonic Sensor | To detect proximity and trigger system   |
 | 4x4 Keypad        | OTP input interface                      |
 | GSM Module (SIM800L) | For sending OTP and alerts via SMS    |
