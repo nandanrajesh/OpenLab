@@ -2,7 +2,7 @@
 
 ## 📌 Project Overview
 
-This project implements a **Smart Door Lock System** using a **Raspberry Pi Pico W** running **MicroPython**, integrating **HOG-based face recognition (off-device processing)**, **OTP-based fallback authentication**, and **real-time intruder alerts**. It features **multi-layered security** suitable for residential and commercial automation.
+This project implements a **Smart Door Lock System** using a **Raspberry Pi** running **MicroPython**, integrating **HOG-based face recognition**, **OTP-based fallback authentication**, and **real-time intruder alerts**. It features **multi-layered security** suitable for residential and commercial automation.
 
 ---
 
